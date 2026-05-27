@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QR Guard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">◆</span>
+          <div>
+            <h1>QR Guard</h1>
+            <p>QRコード安全リーダー</p>
+          </div>
+        </div>
+        <div id="status-pill" class="status-pill idle">
+          <span id="status-icon" aria-hidden="true">▣</span>
+          <span id="status-text">待機中</span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="panel scanner-panel">
+          <div class="panel-header">
+            <h2>読み取り</h2>
+            <div class="segmented" aria-label="読み取り方法">
+              <button id="mode-camera" class="active" type="button" title="カメラ">□</button>
+              <button id="mode-image" type="button" title="画像">▤</button>
+              <button id="mode-manual" type="button" title="URL入力">⌁</button>
+            </div>
+          </div>
+
+          <div class="scanner-frame">
+            <video id="video" muted playsinline></video>
+            <div id="scanner-empty" class="scanner-empty">
+              <span class="qr-glyph" aria-hidden="true">▦</span>
+              <span id="scan-preview">No QR</span>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <button id="camera-button" class="primary" type="button">□ カメラ</button>
+            <label class="file-button">
+              ▤ 画像
+              <input id="image-input" type="file" accept="image/*" />
+            </label>
+          </div>
+
+          <form id="manual-form" class="manual-form">
+            <label for="manual-url">URL</label>
+            <div class="input-row">
+              <input id="manual-url" placeholder="https://example.com" autocomplete="off" />
+              <button class="secondary" type="submit">◆ 検査</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel result-panel">
+          <div class="panel-header">
+            <h2>判定</h2>
+            <span id="score" class="score hidden">0</span>
+          </div>
+
+          <div id="empty-result" class="empty-result">
+            <span aria-hidden="true">◎</span>
+            <span>URL未検査</span>
+          </div>
+
+          <div id="result-stack" class="result-stack hidden">
+            <div id="verdict-block" class="verdict-block">
+              <span id="verdict-icon" aria-hidden="true">◆</span>
+              <div>
+                <strong id="verdict-label">判定</strong>
+                <span id="verdict-host">-</span>
+              </div>
+            </div>
+
+            <dl class="url-facts">
+              <div>
+                <dt>表示ホスト</dt>
+                <dd id="display-host">-</dd>
+              </div>
+              <div>
+                <dt>最終URL</dt>
+                <dd id="effective-url">-</dd>
+              </div>
+              <div>
+                <dt>IP</dt>
+                <dd id="resolved-addresses">-</dd>
+              </div>
+            </dl>
+
+            <label id="confirm-line" class="confirm-line hidden">
+              <input id="confirm-caution" type="checkbox" />
+              注意点を確認した
+            </label>
+
+            <div class="action-row">
+              <button id="open-button" class="primary" type="button" disabled>↗ 開く</button>
+              <button id="copy-button" class="secondary" type="button">□ コピー</button>
+            </div>
+
+            <div id="check-list" class="check-list"></div>
+            <div id="redirects" class="redirects hidden">
+              <h3>リダイレクト</h3>
+              <div id="redirect-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/vendor/jsQR.js"></script>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

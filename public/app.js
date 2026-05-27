@@ -407,6 +407,7 @@ function renderResult(result) {
 function renderReasons(reasons, severity) {
   elements.checkList.replaceChildren(
     ...reasons.map((reason) => {
+      const isWebRiskReason = reason.includes("Google Web Risk");
       const item = document.createElement("article");
       item.className = `check ${severity}`;
       item.innerHTML = `
@@ -416,7 +417,7 @@ function renderReasons(reasons, severity) {
           <p></p>
         </div>
       `;
-      item.querySelector("strong").textContent = "ローカル判定";
+      item.querySelector("strong").textContent = isWebRiskReason ? "Google Web Risk判定" : "ローカル判定";
       item.querySelector("p").textContent = reason;
       return item;
     })

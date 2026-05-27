@@ -108,13 +108,22 @@ h1 {
   border-color: #edc867;
 }
 
+.status-pill.danger,
 .status-pill.dangerous,
 .status-pill.blocked,
+.score.danger,
 .score.dangerous,
 .score.blocked {
   color: #9e2f2f;
   background: #ffe0de;
   border-color: #efa4a0;
+}
+
+.status-pill.unknown,
+.score.unknown {
+  color: #4d5a54;
+  background: #eef3f0;
+  border-color: #c9d3ce;
 }
 
 .workspace {
@@ -276,6 +285,13 @@ h1 {
   background: #b33a3a;
 }
 
+.danger-open {
+  order: 10;
+  color: #7b3434;
+  background: #fff7f6;
+  border-color: #ecc5c2;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.46;
@@ -372,11 +388,18 @@ button:disabled {
   border-color: #edcf7c;
 }
 
+.verdict-block.danger,
 .verdict-block.dangerous,
 .verdict-block.blocked {
   color: #943131;
   background: #fff0ef;
   border-color: #edb2ae;
+}
+
+.verdict-block.unknown {
+  color: #4d5a54;
+  background: #f7f9f8;
+  border-color: #d4ddd8;
 }
 
 .verdict-block strong,

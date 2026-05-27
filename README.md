@@ -8,6 +8,7 @@
 - QR画像ファイルから読み取り
 - 手入力URLの検査
 - `http(s)` 以外、ローカル/内部ネットワーク宛先、実行ファイル、認証情報入りURLなどを警告またはブロック
+- 動的DNS、短縮URL、Punycode、有名サービス名を含む非公式ドメインなどをローカル判定
 - DNS解決先とリダイレクト先を確認
 - 判定後にだけ外部URLを開く
 
@@ -22,6 +23,12 @@ node server/index.mjs
 
 ```text
 http://localhost:8080
+```
+
+## テスト
+
+```bash
+npm test
 ```
 
 ## Docker

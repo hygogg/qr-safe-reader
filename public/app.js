@@ -1,8 +1,26 @@
-const verdictCopy = {
-  safe: { label: "安全", icon: "✓" },
-  caution: { label: "注意", icon: "!" },
-  dangerous: { label: "危険", icon: "!" },
-  blocked: { label: "ブロック", icon: "×" }
+import { analyzeLocalUrlSafety } from "./urlSafety.js";
+
+const levelCopy = {
+  safe: {
+    label: "安全そうです",
+    icon: "✓",
+    message: "安全そうです。ただし最終判断はご自身で行ってください"
+  },
+  caution: {
+    label: "注意",
+    icon: "!",
+    message: "注意が必要なURLです"
+  },
+  danger: {
+    label: "危険",
+    icon: "!",
+    message: "危険な可能性が高いURLです"
+  },
+  unknown: {
+    label: "不明",
+    icon: "?",
+    message: "安全性を確認できませんでした"
+  }
 };
 
 const severityLabel = {
@@ -36,7 +54,10 @@ const elements = {
   verdictHost: document.querySelector("#verdict-host"),
   displayHost: document.querySelector("#display-host"),
   effectiveUrl: document.querySelector("#effective-url"),
-  resolvedAddresses: document.querySelector("#resolved-addresses"),
+  registrableDomain: document.querySelector("#registrable-domain"),
+  scheme: document.querySelector("#scheme"),
+  path: document.querySelector("#path"),
+  query: document.querySelector("#query"),
   confirmLine: document.querySelector("#confirm-line"),
   confirmCaution: document.querySelector("#confirm-caution"),
   openButton: document.querySelector("#open-button"),
@@ -237,10 +258,12 @@ function clearResult() {
   elements.emptyResult.classList.remove("hidden");
   elements.resultStack.classList.add("hidden");
   elements.openButton.disabled = true;
+  elements.openButton.className = "primary";
+  elements.openButton.textContent = "↗ 開く";
   elements.confirmCaution.checked = false;
 }
 
-async function analyze(value) {
+function analyze(value) {
   const trimmed = String(value || "").trim();
   if (!trimmed) {
     setStatus("入力が空です", "caution", "!");
@@ -250,78 +273,97 @@ async function analyze(value) {
   setStatus("検査中", "idle", "…");
   elements.scanPreview.textContent = trimmed;
   elements.openButton.disabled = true;
+  currentResult = analyzeLocalUrlSafety(trimmed);
 
-  try {
-    const response = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: trimmed, networkProbe: true })
-    });
-
-    if (!response.ok) throw new Error("検査に失敗しました");
-    currentResult = await response.json();
-    renderResult(currentResult);
-  } catch (error) {
-    setStatus(error.message || "検査に失敗しました", "blocked", "×");
+  if (!currentResult.isUrl) {
+    renderTextResult(currentResult);
+    return;
   }
+
+  renderResult(currentResult);
 }
 
-function renderResult(result) {
-  const verdict = verdictCopy[result.verdict];
-  setStatus(verdict.label, result.verdict, verdict.icon);
-
-  elements.score.textContent = String(result.score);
-  elements.score.className = `score ${result.verdict}`;
+function renderTextResult(result) {
+  setStatus("テキスト", "unknown", "□");
+  elements.score.classList.add("hidden");
   elements.emptyResult.classList.add("hidden");
   elements.resultStack.classList.remove("hidden");
 
-  elements.verdictBlock.className = `verdict-block ${result.verdict}`;
-  elements.verdictIcon.textContent = verdict.icon;
-  elements.verdictLabel.textContent = verdict.label;
-  elements.verdictHost.textContent = result.displayHost || "URLなし";
-  elements.displayHost.textContent = result.displayHost || "-";
-  elements.effectiveUrl.textContent = result.effectiveUrl || "-";
-  elements.resolvedAddresses.textContent = result.resolvedAddresses.length ? result.resolvedAddresses.join(", ") : "-";
-
-  elements.confirmLine.classList.toggle("hidden", !result.requiresConfirmation);
+  elements.verdictBlock.className = "verdict-block unknown";
+  elements.verdictIcon.textContent = "□";
+  elements.verdictLabel.textContent = "URLではありません";
+  elements.verdictHost.textContent = result.normalizedUrl || "テキスト";
+  elements.displayHost.textContent = "-";
+  elements.effectiveUrl.textContent = result.normalizedUrl || "-";
+  elements.registrableDomain.textContent = "-";
+  elements.scheme.textContent = "-";
+  elements.path.textContent = "-";
+  elements.query.textContent = "-";
+  elements.confirmLine.classList.add("hidden");
   elements.confirmCaution.checked = false;
-  updateOpenButton();
+  elements.openButton.disabled = true;
+  elements.openButton.className = "primary";
+  elements.openButton.textContent = "↗ 開く";
 
+  renderReasons(result.reasons, "info");
+  elements.redirects.classList.add("hidden");
+}
+
+function renderResult(result) {
+  const level = levelCopy[result.level];
+  setStatus(level.label, result.level, level.icon);
+
+  elements.score.classList.add("hidden");
+  elements.emptyResult.classList.add("hidden");
+  elements.resultStack.classList.remove("hidden");
+
+  elements.verdictBlock.className = `verdict-block ${result.level}`;
+  elements.verdictIcon.textContent = level.icon;
+  elements.verdictLabel.textContent = level.message;
+  elements.verdictHost.textContent = result.hostname || "URLなし";
+  elements.displayHost.textContent = result.hostname || "-";
+  elements.effectiveUrl.textContent = result.normalizedUrl || "-";
+  elements.registrableDomain.textContent = result.registrableDomain || "-";
+  elements.scheme.textContent = result.scheme || "-";
+  elements.path.textContent = result.path || "-";
+  elements.query.textContent = result.query || "-";
+
+  elements.confirmLine.classList.toggle("hidden", result.level === "safe" || result.level === "danger");
+  elements.confirmCaution.checked = false;
+  elements.openButton.className = result.level === "danger" ? "secondary danger-open" : "primary";
+  elements.openButton.textContent = result.level === "danger" ? "確認して開く" : "↗ 開く";
+  updateOpenButton();
+  renderReasons(result.reasons, result.level === "danger" ? "critical" : result.level === "caution" ? "medium" : "info");
+
+  elements.redirects.classList.add("hidden");
+  elements.redirectList.replaceChildren();
+}
+
+function renderReasons(reasons, severity) {
   elements.checkList.replaceChildren(
-    ...result.checks.map((check) => {
+    ...reasons.map((reason) => {
       const item = document.createElement("article");
-      item.className = `check ${check.severity}`;
+      item.className = `check ${severity}`;
       item.innerHTML = `
-        <span>${severityLabel[check.severity]}</span>
+        <span>${severityLabel[severity]}</span>
         <div>
           <strong></strong>
           <p></p>
         </div>
       `;
-      item.querySelector("strong").textContent = check.title;
-      item.querySelector("p").textContent = check.detail;
+      item.querySelector("strong").textContent = "ローカル判定";
+      item.querySelector("p").textContent = reason;
       return item;
-    })
-  );
-
-  elements.redirects.classList.toggle("hidden", result.redirects.length === 0);
-  elements.redirectList.replaceChildren(
-    ...result.redirects.map((hop) => {
-      const row = document.createElement("div");
-      row.className = "redirect-hop";
-      row.innerHTML = `<span>${hop.status}</span><p></p>`;
-      row.querySelector("p").textContent = hop.to;
-      return row;
     })
   );
 }
 
 function updateOpenButton() {
-  if (!currentResult?.canOpen) {
+  if (!currentResult?.isUrl) {
     elements.openButton.disabled = true;
     return;
   }
-  elements.openButton.disabled = Boolean(currentResult.requiresConfirmation && !elements.confirmCaution.checked);
+  elements.openButton.disabled = Boolean(currentResult.level === "caution" && !elements.confirmCaution.checked);
 }
 
 elements.cameraButton.addEventListener("click", () => {
@@ -345,15 +387,24 @@ elements.manualForm.addEventListener("submit", (event) => {
 elements.confirmCaution.addEventListener("change", updateOpenButton);
 
 elements.openButton.addEventListener("click", () => {
-  if (!currentResult?.openUrl || elements.openButton.disabled) return;
-  window.open(currentResult.openUrl, "_blank", "noopener,noreferrer");
+  if (!currentResult?.normalizedUrl || elements.openButton.disabled) return;
+
+  if (currentResult.level === "danger") {
+    const firstConfirmed = window.confirm("危険な可能性が高いURLです。本当に開く準備をしますか？");
+    if (!firstConfirmed) return;
+
+    const secondConfirmed = window.confirm("フィッシングや不正サイトの可能性があります。それでも外部URLを開きますか？");
+    if (!secondConfirmed) return;
+  }
+
+  window.open(currentResult.normalizedUrl, "_blank", "noopener,noreferrer");
 });
 
 elements.copyButton.addEventListener("click", async () => {
-  const value = currentResult?.effectiveUrl ?? currentResult?.normalizedUrl ?? elements.scanPreview.textContent;
+  const value = currentResult?.normalizedUrl ?? elements.scanPreview.textContent;
   if (!value) return;
   await navigator.clipboard.writeText(value);
-  setStatus("コピーしました", currentResult?.verdict ?? "idle", currentResult ? verdictCopy[currentResult.verdict].icon : "□");
+  setStatus("コピーしました", currentResult?.level ?? "idle", currentResult ? levelCopy[currentResult.level].icon : "□");
 });
 
 elements.modeCamera.addEventListener("click", () => setMode("camera"));

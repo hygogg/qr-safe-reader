@@ -9,6 +9,7 @@
 - 手入力URLの検査
 - `http(s)` 以外、ローカル/内部ネットワーク宛先、実行ファイル、認証情報入りURLなどを警告またはブロック
 - 動的DNS、短縮URL、Punycode、有名サービス名を含む非公式ドメインなどをローカル判定
+- Google Web Risk API による既知脅威URLのサーバーサイド照合
 - DNS解決先とリダイレクト先を確認
 - 判定後にだけ外部URLを開く
 
@@ -23,6 +24,12 @@ node server/index.mjs
 
 ```text
 http://localhost:8080
+```
+
+Google Web Risk を有効にする場合は、環境変数を設定します。未設定でもローカル判定だけで動きます。
+
+```bash
+GOOGLE_WEB_RISK_API_KEY=...
 ```
 
 ## テスト
@@ -47,6 +54,8 @@ GitHub リポジトリを Vercel にインポートすると、そのままデ�
 - Install Command: 空欄でも可
 
 静的UIは `public/` から配信され、URL検査APIは `api/analyze.mjs` と `api/healthz.mjs` の Serverless Function として動きます。
+
+Google Web Risk を使う場合は、Vercel の Environment Variables に `GOOGLE_WEB_RISK_API_KEY` を設定してください。APIキーはサーバー側の `api/threat-check.mjs` でのみ使用され、ブラウザには渡しません。
 
 ## 判定について
 

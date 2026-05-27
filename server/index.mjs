@@ -4,6 +4,7 @@ import http from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeUrl } from "./urlSafety.mjs";
+import { checkWebRisk } from "./webRisk.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const publicDir = join(root, "public");
@@ -82,6 +83,22 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       const result = await analyzeUrl(body.value, body.networkProbe !== false);
+      sendJson(response, 200, result);
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/threat-check") {
+      const body = await readJson(request);
+      if (typeof body.url !== "string" || body.url.trim().length === 0 || body.url.length > 4096) {
+        sendJson(response, 400, { error: "Invalid URL value." });
+        return;
+      }
+      const parsed = new URL(body.url);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        sendJson(response, 400, { error: "Only http and https URLs can be checked." });
+        return;
+      }
+      const result = await checkWebRisk(parsed.href);
       sendJson(response, 200, result);
       return;
     }

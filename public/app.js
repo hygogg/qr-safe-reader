@@ -74,6 +74,7 @@ let stream = null;
 let scanTimer = null;
 let lastScan = "";
 let detectorWarningShown = false;
+let analysisRequestId = 0;
 
 async function getDetector() {
   if (!("BarcodeDetector" in window)) {
@@ -253,6 +254,7 @@ async function scanImage(file) {
 }
 
 function clearResult() {
+  analysisRequestId += 1;
   currentResult = null;
   elements.score.classList.add("hidden");
   elements.emptyResult.classList.remove("hidden");
@@ -263,7 +265,7 @@ function clearResult() {
   elements.confirmCaution.checked = false;
 }
 
-function analyze(value) {
+async function analyze(value) {
   const trimmed = String(value || "").trim();
   if (!trimmed) {
     setStatus("入力が空です", "caution", "!");
@@ -273,6 +275,7 @@ function analyze(value) {
   setStatus("検査中", "idle", "…");
   elements.scanPreview.textContent = trimmed;
   elements.openButton.disabled = true;
+  const requestId = ++analysisRequestId;
   currentResult = analyzeLocalUrlSafety(trimmed);
 
   if (!currentResult.isUrl) {
@@ -281,6 +284,68 @@ function analyze(value) {
   }
 
   renderResult(currentResult);
+  await enrichWithWebRisk(requestId, currentResult);
+}
+
+async function enrichWithWebRisk(requestId, localResult) {
+  if (!localResult.isUrl) return;
+
+  setStatus("Web Risk照合中", localResult.level, levelCopy[localResult.level].icon);
+
+  try {
+    const response = await fetch("/api/threat-check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: localResult.normalizedUrl })
+    });
+
+    if (requestId !== analysisRequestId) return;
+
+    if (!response.ok) {
+      const failedResult = appendReason(localResult, "Google Web Risk照合に失敗しました。ローカル判定のみを表示しています。");
+      currentResult = failedResult;
+      renderResult(failedResult);
+      return;
+    }
+
+    const webRisk = await response.json();
+    if (requestId !== analysisRequestId) return;
+
+    const merged = mergeWebRiskResult(localResult, webRisk);
+    currentResult = merged;
+    renderResult(merged);
+  } catch {
+    if (requestId !== analysisRequestId) return;
+    const failedResult = appendReason(localResult, "Google Web Risk照合に失敗しました。ローカル判定のみを表示しています。");
+    currentResult = failedResult;
+    renderResult(failedResult);
+  }
+}
+
+function appendReason(result, reason) {
+  return {
+    ...result,
+    reasons: [...result.reasons, reason]
+  };
+}
+
+function mergeWebRiskResult(localResult, webRisk) {
+  if (!webRisk?.enabled || !webRisk.checked) {
+    return appendReason(localResult, "Google Web Risk APIは未設定です。ローカル判定のみを表示しています。");
+  }
+
+  if (!webRisk.matched) {
+    return appendReason(localResult, "Google Web Riskでは既知の脅威として検出されませんでした。");
+  }
+
+  return {
+    ...localResult,
+    level: "danger",
+    reasons: [
+      ...localResult.reasons,
+      `Google Web Riskで既知の脅威として検出されました: ${webRisk.threatTypes.join(", ")}`
+    ]
+  };
 }
 
 function renderTextResult(result) {

@@ -41,6 +41,7 @@ const elements = {
   confirmCaution: document.querySelector("#confirm-caution"),
   openButton: document.querySelector("#open-button"),
   copyButton: document.querySelector("#copy-button"),
+  securlButton: document.querySelector("#securl-button"),
   checkList: document.querySelector("#check-list"),
   redirects: document.querySelector("#redirects"),
   redirectList: document.querySelector("#redirect-list")
@@ -237,6 +238,7 @@ function clearResult() {
   elements.emptyResult.classList.remove("hidden");
   elements.resultStack.classList.add("hidden");
   elements.openButton.disabled = true;
+  elements.securlButton.disabled = true;
   elements.confirmCaution.checked = false;
 }
 
@@ -286,6 +288,7 @@ function renderResult(result) {
   elements.confirmLine.classList.toggle("hidden", !result.requiresConfirmation);
   elements.confirmCaution.checked = false;
   updateOpenButton();
+  updateSecurlButton();
 
   elements.checkList.replaceChildren(
     ...result.checks.map((check) => {
@@ -324,6 +327,36 @@ function updateOpenButton() {
   elements.openButton.disabled = Boolean(currentResult.requiresConfirmation && !elements.confirmCaution.checked);
 }
 
+function getSecurlTarget() {
+  if (!currentResult?.normalizedUrl) return null;
+  try {
+    const target = new URL(currentResult.normalizedUrl);
+    if (!["http:", "https:"].includes(target.protocol)) return null;
+    if (currentResult.verdict === "blocked") return null;
+    return target.href;
+  } catch {
+    return null;
+  }
+}
+
+function updateSecurlButton() {
+  elements.securlButton.disabled = getSecurlTarget() === null;
+}
+
+function openSecurlInvestigation() {
+  const target = getSecurlTarget();
+  if (!target) return;
+
+  const confirmed = window.confirm(
+    "読み取ったURLをSecURLへ送信して追加調査します。外部サービスへURLが渡されます。続行しますか？"
+  );
+  if (!confirmed) return;
+
+  const securlUrl = new URL("https://securl.nu/");
+  securlUrl.searchParams.set("url", target);
+  window.open(securlUrl.href, "_blank", "noopener,noreferrer");
+}
+
 elements.cameraButton.addEventListener("click", () => {
   if (stream) stopCamera();
   else void startCamera();
@@ -355,6 +388,8 @@ elements.copyButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(value);
   setStatus("コピーしました", currentResult?.verdict ?? "idle", currentResult ? verdictCopy[currentResult.verdict].icon : "□");
 });
+
+elements.securlButton.addEventListener("click", openSecurlInvestigation);
 
 elements.modeCamera.addEventListener("click", () => setMode("camera"));
 elements.modeImage.addEventListener("click", () => setMode("image"));
